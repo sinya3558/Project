@@ -5,36 +5,45 @@ from PyQt5.QtWidgets import (
 from PyQt5.QtGui import QPixmap
 from PyQt5.QtCore import Qt
 from api.openai_api import get_image_description
-from utils.file_handler import get_image_file, encode_image_to_base64
+from utils.file_handler import get_image_file, encode_image_to_base64   # 안쓰이는뎅?
 from utils.config import DB_PATH
 import sqlite3
 
-class MainWindow(QMainWindow):
+# improt gqcnn model
+from model.gq_cnn import GQCNN
+
+class MainWindow(QMainWindow):  # GUI CLASS
     def __init__(self):
         super().__init__()
-        self.setWindowTitle("OpenAI 이미지 설명 프로그램")
-        self.setGeometry(100, 100, 700, 500)
+        self.setWindowTitle("Manipulation Robot Grasp Predictor")
+        self.setGeometry(100, 100, 800, 600)
         self.image_path = None
+
+        # init model to check grasp status
+        self.gq_cnn = GQCNN()
+
         self.init_ui()
         self.init_db()
 
+    # Part 1 - UI
     def init_ui(self):
-        self.image_label = QLabel("이미지를 불러오세요")
+        self.image_label = QLabel("Upload your image")
         self.image_label.setFixedSize(300, 300)
         self.image_label.setAlignment(Qt.AlignCenter)
         self.image_label.setStyleSheet("border: 1px solid black;")
 
-        self.load_button = QPushButton("이미지 열기")
+        self.load_button = QPushButton("Open Image")
         self.load_button.clicked.connect(self.load_image)
 
         self.text_input = QTextEdit()
-        self.text_input.setPlaceholderText("GPT에게 보낼 추가 프롬프트 입력")
+        self.text_input.setPlaceholderText("(Optional) Ask GPT why it didn't work")
 
         self.result_output = QTextEdit()
         self.result_output.setReadOnly(True)
 
-        self.generate_button = QPushButton("GPT 설명 생성")
-        self.generate_button.clicked.connect(self.generate_description)
+        self.generate_button = QPushButton("Process Image (Grasp + GPT)")
+        # self.generate_button.clicked.connect(self.generate_description)
+        self.generate_button.clicked.connect(self.on_process_image_clicked)
 
         top_layout = QHBoxLayout()
         top_layout.addWidget(self.image_label)
@@ -50,54 +59,81 @@ class MainWindow(QMainWindow):
         container.setLayout(layout)
         self.setCentralWidget(container)
 
+    # Part 2 - DB
     def init_db(self):
         conn = sqlite3.connect(DB_PATH)
         cursor = conn.cursor()
-        # 쿼리 메세지
+        # 쿼리 메세지 : success/fail, gpt_prompt, fail_reason(gpt)
         cursor.execute('''
             CREATE TABLE IF NOT EXISTS image_logs (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 image BLOB,
+                grasp_status TEXT,
+                fail_reason TEXT,
                 prompt TEXT,
-                response TEXT,
                 timestamp DATETIME DEFAULT CURRENT_TIMESTAMP
             )
         ''')
         conn.commit()
         conn.close()
 
+    # Part 3 - load img
     def load_image(self):
         try:
             path = get_image_file()
             if path:
                 pixmap = QPixmap(path).scaled(self.image_label.width(), self.image_label.height(), Qt.KeepAspectRatio)
                 if pixmap.isNull():
-                    raise ValueError("이미지를 불러올 수 없습니다.")
+                    raise ValueError("Unable to load the image.")
                 self.image_label.setPixmap(pixmap)
                 self.image_path = path
+                self.result_output.setPlainText("Image loaded successfully.")
         except Exception as e:
-            QMessageBox.warning(self, "오류", f"이미지 불러오기 실패: {e}")
+            QMessageBox.warning(self, "Error", f"Failed to load the image: {e}")
 
+    # Part 4 - manual GPT(prompt)
+    def on_process_image_clicked(self):
+        manual_text = self.text_input.toPlainText()
+        self.process_image(manual_prompt = manual_text if manual_text else None)
 
-# gen_description : gpt 설명 생성 부분 -> 이걸 이제 db에 저장할 수 잇게 해보자!
-    def generate_description(self):
+    # Part 5 - classify grasp + GPT fail reason
+    def process_image(self, manual_prompt: str = None):
         if not self.image_path:
-            self.result_output.setPlainText("이미지를 먼저 불러와 주세요.")
+            self.result_output.setPlainText("Please load an image first.")
             return
         
-        prompt = self.text_input.toPlainText()
+        try:
+            # PREDICT grasp status using gq-cnn
+            prediction = self.gq_cnn.predict(self.image_path)
+            grasp_status = "SUCCESS" if prediction else "FAIL"
 
+            # if grasp == "FAIL", ask GPT
+            fail_reason = None
+            prompt = None
+            if grasp_status == "FAIL":
+                prompt = manual_prompt or (
+                    "List only the top 3 reasons why manipulation robot grasp failed in very short keywords separated by commas. Only give keywords, no full sentences.")
+                fail_reason = get_image_description(self.image_path, prompt)
 
-        base64_image = encode_image_to_base64(self.image_path)
-        result = get_image_description(self.image_path, prompt)
-        self.result_output.setPlainText(result)
+            # prompt = self.text_input.toPlainText()
+            # base64_image = encode_image_to_base64(self.image_path)
+            # result = get_image_description(self.image_path, prompt)
 
-        with sqlite3.connect(DB_PATH) as conn:
-            cursor = conn.cursor()
-            with open(self.image_path, "rb") as f:
-                image_blob = f.read()
-            cursor.execute('''
-                INSERT INTO image_logs (image, prompt, response) VALUES (?, ?, ?)
-            ''', (image_blob, prompt, result))
-            conn.commit()
+            # print out result
+            result = f"Grasp: {grasp_status}"
+            if fail_reason:
+                result += f"\nFail Reason (Automated by GPT): {fail_reason}"
+            self.result_output.setPlainText(result)
 
+            # save to DB
+            with sqlite3.connect(DB_PATH) as conn:
+                cursor = conn.cursor()
+                with open(self.image_path, "rb") as f:
+                    image_blob = f.read()
+                cursor.execute('''
+                    INSERT INTO image_logs (image, grasp_status, fail_reason, prompt)
+                    VALUES (?, ?, ?, ?)
+                ''', (image_blob, grasp_status, fail_reason, prompt))
+                conn.commit()
+        except Exception as e:
+            QMessageBox.warning(self, "Processing Error", f"Failed to process image: {e}")
