@@ -3,3 +3,8 @@ __pycache__/
 *.db
 .env
 .vscode/colcon.env
+model/
+data/
+s_venv/
+sample_data/
+model/gqcnn_trained.pth
