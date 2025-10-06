@@ -3,8 +3,13 @@ __pycache__/
 *.db
 .env
 .vscode/colcon.env
-model/
+# model/
+model/gqcnn_rgbd.h5
+model/train_gqcnn.py
+model/gqcnn_rgbd_tf/
 data/
 s_venv/
 sample_data/
 model/gqcnn_trained.pth
+# cloned repo
+gqcnn_repo/
