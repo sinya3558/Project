@@ -63,7 +63,7 @@ class MainWindow(QMainWindow):  # GUI CLASS
     def init_db(self):
         conn = sqlite3.connect(DB_PATH)
         cursor = conn.cursor()
-        # 쿼리 메세지 : success/fail, gpt_prompt, fail_reason(gpt)
+        # 쿼리 메세지 : success/fail, fail_reason(gpt), gpt_prompt
         cursor.execute('''
             CREATE TABLE IF NOT EXISTS image_logs (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -87,7 +87,6 @@ class MainWindow(QMainWindow):  # GUI CLASS
                     raise ValueError("Unable to load the image.")
                 self.image_label.setPixmap(pixmap)
                 self.image_path = path
-                self.result_output.setPlainText("Image loaded successfully.")
         except Exception as e:
             QMessageBox.warning(self, "Error", f"Failed to load the image: {e}")
 
@@ -103,7 +102,7 @@ class MainWindow(QMainWindow):  # GUI CLASS
             return
         
         try:
-            # PREDICT grasp status using gq-cnn
+            # predict grasp status using gq-cnn (success/fail (+ probability %))
             prediction = self.gq_cnn.predict(self.image_path)
             grasp_status = "SUCCESS" if prediction else "FAIL"
 
@@ -120,7 +119,7 @@ class MainWindow(QMainWindow):  # GUI CLASS
             # result = get_image_description(self.image_path, prompt)
 
             # print out result
-            result = f"Grasp: {grasp_status}"
+            result = f"Grasp: {grasp_status}"   # ({percentage*100:.1f}%)
             if fail_reason:
                 result += f"\nFail Reason (Automated by GPT): {fail_reason}"
             self.result_output.setPlainText(result)
