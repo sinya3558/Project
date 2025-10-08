@@ -7,6 +7,28 @@ test
 - [x] rbg + depth 모드 지원
 - [ ] SUCTION4.0 모델 다시 받기. 아님 그냥 써야함
 - [ ] re-train model -> 과적합이다!
-- [ ] dataset 20 카테고리 정도 -> part0 file 조심
-- [ ] python3.7 + tf 1.x + cuda 11.5
+- [x] 샘플데이터 12 카테고리 : 이미지 5982 장, JSON 2985
+- [X] dataset 100 카테고리  -> part0 file 조심
+- [ ] ~~python3.7 + tf .x + cuda 11.5~~
+- [ ] update requirements.txt
+- [ ] python3.10 + ft 2.x + cuda 11.5
+
+기존 GQCNNTF 구조
+
+1. conv1-1, conv1-2
+2. conv2-1, conv2-2
+3. conv3-1, conv3-2
+4. fc3
+5. pc1
+6. pc2
+7. fc4
+8. fc5
+
+커스텀 GQCNNTF 구조
+1. conv1-1, conv1-2
+2. conv2-1, conv2-2
+3. conv3-1, conv3-2
+4. fc3
+7. fc4
+8. fc5
 

@@ -11,7 +11,8 @@ class GQCNN:
         self.model = load_model(model_path) # load weight from trained model
         # print(f"load trained gq cnn model success!")
 
-    def predict(self, image_path):
+
+    def preprocess(self, image_path):
         # load imgs
         if not os.path.exists(image_path):
             raise FileNotFoundError(f"Image data not found: {image_path}")
@@ -30,7 +31,13 @@ class GQCNN:
 
         # rgb_depth -> 4 channels
         x = np.expand_dims(np.concatenate([rgb, depth], axis=-1), axis=0)  # (1, 224, 224, 4) batch sjhape
+        # return image stream, x
+        return x
 
+    def predict(self, image_path):
         # predict
-        prob = self.model.predict(x)[0][0]
-        return bool(round(prob))  # (2)probability 추가(for test, SUCCESS (87.3%)) + (1) SUCCESS/FAIL
+        x = self.preprocess(image_path)
+        prob = float(self.model.predict(x)[0][0])
+        # bool_success = bool(round(prob))  # (2)probability 추가(for test, SUCCESS (87.3%)) + 이후에 추가
+        # return bool_success, prob
+        return bool(round(prob))  # (1) SUCCESS/FAIL

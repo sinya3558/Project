@@ -10,7 +10,7 @@ from utils.config import DB_PATH
 import sqlite3
 
 # improt gqcnn model
-from model.gq_cnn import GQCNN
+from model import GQCNN
 
 class MainWindow(QMainWindow):  # GUI CLASS
     def __init__(self):
@@ -20,7 +20,7 @@ class MainWindow(QMainWindow):  # GUI CLASS
         self.image_path = None
 
         # init model to check grasp status
-        self.gq_cnn = GQCNN()
+        self.gq_cnn = GQCNN(model_path = "model/gqcnn_rgbd.h5")
 
         self.init_ui()
         self.init_db()
@@ -103,7 +103,7 @@ class MainWindow(QMainWindow):  # GUI CLASS
         
         try:
             # predict grasp status using gq-cnn (success/fail (+ probability %))
-            prediction = self.gq_cnn.predict(self.image_path)
+            prediction = self.gq_cnn.predict(self.image_path)  
             grasp_status = "SUCCESS" if prediction else "FAIL"
 
             # if grasp == "FAIL", ask GPT
