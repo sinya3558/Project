@@ -12,59 +12,87 @@ from tqdm import tqdm  # 진행률 표시
 # loss & accuracy 그래프 출력용
 import matplotlib.pyplot as plt
 from tensorflow.keras import layers, models
+from tensorflow.keras.utils import Sequence
+from tensorflow.keras.preprocessing.image import img_to_array, load_img
 
-# load datasets
+# load datasets -> overfitting... need to be fixed
 class CustomGraspDataset:
-    def __init__(self, img_dir, ann_dir):
+    def __init__(self, img_dir, ann_dir, batch_size = 8, target_size = (224, 224), aug = False): # default(batch = 8, size of target = 224x224)
         self.img_dir = img_dir
         self.ann_dir = ann_dir
-        self.files = []
+        self.datasets = []
+        # 배치랑 타겟 이미지 사이즈 추가
+        self.batch_size = batch_size
+        self.target_size = target_size
+        # augmentation
+        self.aug = aug
 
-        for f in os.listdir(img_dir):
-            if not f.endswith(".jpg"):
-                continue
-            rgb_path = os.path.join(img_dir, f)
-            depth_path = os.path.join(img_dir, f.replace(".jpg","_depth.png"))
-            json_file = f.replace("TS_", "TL_").replace(".jpg",".json")
-            json_path = os.path.join(ann_dir, json_file)
+        # 데이터를 못찾음 자꾸 2:1 이라서 그런가
+        for root, _, datasets in os.walk(img_dir):
+            for f in datasets:
+                if not f.endswith(".jpg"):
+                    continue
+        
+        # 모든 JSON 파일 경로를 미리 딕셔너리로 mapping
+        json_map = {}
+        for root, _, datasets in os.walk(ann_dir):
+            for f in datasets:
+                if f.endswith(".json"):
+                    json_map[f] = os.path.join(root, f)
 
-            if os.path.exists(rgb_path) and os.path.exists(depth_path) and os.path.exists(json_path):
-                self.files.append(f)
+                rgb_path = os.path.join(root, f)
+                depth_path = os.path.join(root, f.replace(".jpg","_depth.png"))
+                json_file = f.replace(".jpg",".json")
+                json_path = json_map.get(json_file, None)
 
-        if len(self.files) == 0:
-            raise ValueError("No data found. Check your data directory.")
+                # check missignn data
+                if os.path.exists(rgb_path) and os.path.exists(depth_path):
+                    self.datasets.append((rgb_path, depth_path, json_path)) # wrap w tuple
+                # else:
+                #     print(f" RGB exists: {os.path.exists(rgb_path)}")
+                #     print(f" Depth exists: {os.path.exists(depth_path)}")
+                #     print(f" JSON exists: {os.path.exists(json_path)}")
+
+            if len(self.datasets) == 0:
+                raise ValueError("No data found. Check your data directory.")
 
     def __len__(self):
-        return len(self.files)
+        return len(self.datasets)
 
     def get_batch(self, batch_size):
-        for i in range(0, len(self.files), batch_size):
-            batch_files = self.files[i:i+batch_size]
+        for i in range(0, len(self.datasets), batch_size):
+            batch_files = self.datasets[i:i+batch_size]
             imgs = []
             # label_text = []   # succ/fail 확인용
             label_int = []      # 0/1 트레이닝용
-            for f in batch_files:
+
+            for rgb_path, depth_path, json_path in batch_files:
                 # load rgb
-                rgb = np.array(Image.open(os.path.join(self.img_dir, f)).resize((224,224)), dtype=np.float32)/255.0
+                rgb = img_to_array(load_img(rgb_path, target_size=self.target_size))
                 
                 # load depth
-                depth = np.array(Image.open(os.path.join(self.img_dir, f.replace(".jpg","_depth.png"))).resize((224,224)), dtype=np.float32)/255.0
-                depth = np.expand_dims(depth, axis=-1)
+                depth = img_to_array(load_img(depth_path, target_size=self.target_size, color_mode="grayscale"))
+                # depth = np.expand_dims(depth, axis=-1)
+
+                # normalize
+                rgb = rgb/ 225.0
+                depth = depth/ 225.0
 
                 # rgb + depth -> 4 channel input
-                img = np.concatenate([rgb, depth], axis=-1)
+                img = np.concatenate([rgb, depth], axis=-1) # shape: (224,224,4)
                 imgs.append(img)
 
                 # load label
-                json_file = f.replace("TS_", "TL_").replace(".jpg",".json")
-                with open(os.path.join(self.ann_dir, json_file), "r", encoding="utf-8") as jf:
-                    data = json.load(jf)
-                    # grasp_result = int(data.get("grip_succeed", 0) )     # "grasp_succeed" exists in JSON files + 모델 학습용(1/0)
+                # json_file = f.replace("TS_", "TL_").replace(".jpg",".json")   # 매칭이 안됨..
+                with open(json_path, "r", encoding="utf-8") as jf:
+                    is_succeed = json.load(jf)
+                    # grasp_result = int(data.get("grip_succeed", 0) )     # "grasp_succeed" exists in JSON datasets + 모델 학습용(1/0)
                     # label_text = "SUCCESS" if grasp_result == 1 else "FAIL"   # tags(text): "SUCCESS", "FAIL"
 
                     # label_text.append(label_text)     # error -> inference only
-                    label_int.append(int(data.get("grip_succeed", 0)))
+                label_int.append(int(is_succeed.get("grip_succeed", 0)))
 
+            # numpy array 
             yield np.array(imgs, dtype=np.float32), np.array(label_int, dtype=np.float32)
 
 
@@ -136,17 +164,21 @@ if __name__ == "__main__":
     save_path = "gqcnn_rgbd.h5"
     '''
     base_dir = os.path.dirname(os.path.abspath(__file__))
-    img_dir = os.path.join(base_dir, "../data/imgs")
-    ann_dir = os.path.join(base_dir, "../data/annotations")
+    # add validation datasets
+    train_img_dir = os.path.join(base_dir, "../data/Training/imgs")
+    train_ann_dir = os.path.join(base_dir, "../data/Training/annotations")
+    val_img_dir = os.path.join(base_dir, "../data/Validation/imgs")
+    val_ann_dir = os.path.join(base_dir, "../data/Validation/annotations")
     save_path = os.path.join(base_dir, "gqcnn_rgbd.h5")
 
     # hyperparameters
     batch_size = 8
-    epochs = 10
+    epochs = 16     # 1 epoch = 30분
     lr = 1e-3
 
-    # data
-    dataset = CustomGraspDataset(img_dir, ann_dir)
+    # data -> need to be fixed -> 1, train + 2. val
+    train_dataset = CustomGraspDataset(img_dir, ann_dir, aug=True)
+    val_dataset = CustomGraspDataset()  # 여기까지 함!
 
     # model:custom gq-cnn
     model = custom_gqcnn_rgbd_2d(input_shape=(224,224,4))
