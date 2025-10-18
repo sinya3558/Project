@@ -1,5 +1,8 @@
-# Project
-test 
+# Project : 파지 품질 관리 태그 검색기
+
+## (WIP) 사용한 데이터셋, 모델 및 진행사항 간단 노트
+- [노션 페이지](https://www.notion.so/28e37748289c806eb63cfded789800f3?source=copy_link)
+
 ## 해야할 것
 
 - [x] 확률 뽑는거 제거
@@ -13,8 +16,8 @@ test
 - [ ] ~~python3.7 + tf .x + cuda 11.5~~
 - [ ] update requirements.txt
 - [ ] python3.10 + ft 2.x + [cuda 11.5 <-> tf 2.11] (유지할 것)
-- [ ] overfitting -> add normalized layers
-- [ ] fix main func in train_gqcnn
+- [X] overfitting -> add normalized layers
+- [X] fix main func in train_gqcnn
 
 기존 GQCNNTF 구조
 

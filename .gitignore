@@ -5,6 +5,8 @@ __pycache__/
 .vscode/colcon.env
 # model/
 model/gqcnn_rgbd.h5
+model/gqcnn_rgb_json.h5
+model/object_classes.json
 model/train_gqcnn.py
 model/gqcnn_rgbd_tf/
 data/
@@ -13,3 +15,41 @@ sample_data/
 model/gqcnn_trained.pth
 # cloned repo
 gqcnn_repo/
+
+# sample dataset
+test_data/
+
+# 현재 필요없는거(10/8)
+model/infer_gq_cnn_rgbd.py
+
+# 필요없는 파일들2222(10/12) 
+# 아래 파일들 빼고 전부 다
+# model_path = "model/gqcnn_rgbd_best.h5",
+# infer_gqcnn_rgbd.py
+# train_gqcnn_new.py
+
+readme_회고.md
+model/saved_metrics
+
+## 모델 폴더 내부
+# 1. 학습한 모델
+model/gqcnn_rgbd_final.h5
+model/gqcnn_rgbd_old.h5
+model/gqcnn_rgbd.h5
+model/gqcnn_rgbd_best.h5
+
+# 2. json
+model/best_threshold.json
+model/object_classes.json
+
+# 3. train models
+model/train_gqcnn_no_overfitting.py
+model/train_gqcnn_json_rgb.py
+model/train_gqcnn_rgbd_2d.py
+
+# 4. inference model
+model/infer_gq_cnn_json.py
+
+######### 될때까지 github 업로드 보류 ############
+model/infer_gqcnn_rgbd.py
+model/train_gqcnn_new.py
